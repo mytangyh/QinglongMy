@@ -36,7 +36,7 @@
 ## 添加仓库
 
    ```shell
-   ql repo https://github.com/mgmg22/QinglongMy.git "summary|stock_spider|trade|epic_free_game|xb|send_qq|job" "activity|backUp|bewly" "sendNotify|stopwords|util" "main"
+   ql repo https://github.com/mytangyh/QinglongMy.git "summary|stock_spider|trade|epic_free_game|xb|send_qq|job" "activity|backUp|bewly" "sendNotify|stopwords|util" "main"
    ```
 
 ## 推送渠道及在线测试
@@ -82,9 +82,6 @@ export admin_uid=
 
 ## 本地开发
   复制 .env.example 为 .env 并填写配置
-
-## 全网羊毛线报精选-微信订阅
-![](https://wxpusher.zjiecode.com/api/qrcode/CeSPArVFNdJlGE2lmebXUKTQZTEY3ed8luFzGQ61Ko8H39eBhEhnwvSCNKuFBJqn.jpg)
 
 ## Special statement:
 
