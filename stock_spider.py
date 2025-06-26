@@ -4,6 +4,7 @@ new Env('上证指数');
 雪球API:https://github.com/uname-yang/pysnowball
 申万宏源数据：https://www.swsresearch.com/institute_sw/allIndex/releasedIndex/releasedetail?code=801150&name=%E5%8C%BB%E8%8D%AF%E7%94%9F%E7%89%A9
 """
+import sendNotify
 from sendNotify import serverJMy
 import requests
 import pysnowball as ball
@@ -113,7 +114,7 @@ def add_sw_increase():
 def notify_with_markdown():
     if len(notifyData) < 2:
         print("没有数据！")
-        serverJMy("获取上证数据失败，请检查！！", "")
+        sendNotify.dingding_bot("获取上证数据失败，请检查！！", "")
         return
     markdown_text = f'''### {get_today()} 行情
 | 名称 | 现价 | 涨幅 | 均价 |
@@ -121,7 +122,7 @@ def notify_with_markdown():
 '''
     for item in notifyData:
         markdown_text += f'| [{item["name"]}]({item["href"]}) | {item["current"]} | {item["increase"]}%| {item["avg_price"]} |\n'
-    serverJMy(generate_title(), markdown_text)
+    sendNotify.dingding_bot(generate_title(), markdown_text)
     with open("log_stock.md", 'w', encoding='utf-8') as f:
         f.write(markdown_text)
 

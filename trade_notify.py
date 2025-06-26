@@ -49,11 +49,11 @@ def check_buy_point(open_price, current, low, title, content):
 def send_notification(title, content):
     print(title)
     print(content)
-    sendNotify.push_me(title, content, "text")
+    sendNotify.dingding_bot(title, content)
 
 
 if __name__ == '__main__':
     r = requests.get("https://xueqiu.com/hq", headers={"user-agent": "Mozilla"})
     t = r.cookies["xq_a_token"]
     ball.set_token(f'xq_a_token={t}')
-    add_xq_increase('SH600519')
+    add_xq_increase('SH603538')

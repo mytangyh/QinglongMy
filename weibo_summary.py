@@ -222,7 +222,7 @@ def notify_markdown():
 '''
         insert_db(summary_list)
         # sendNotify.push_me(get_title(), markdown_text, "markdown")
-        sendNotify.push_me(get_title(), markdown_text, "markdata")
+        sendNotify.dingding_bot(get_title(), markdown_text)
         with open("log_weibo.md", 'w', encoding='utf-8') as f:
             f.write(markdown_text)
     else:

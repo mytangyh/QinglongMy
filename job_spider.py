@@ -1,16 +1,24 @@
 #!/bin/env python3
-# -*- coding: utf-8 -*
+# -*- coding: utf-8 -*-
 """
 cron: 1 * * * * job_spider.py
 new Env('远程工作');
 """
-import requests
-from sendNotify import is_product_env, dingding_bot_with_key
+
+import asyncio
+import json
 import sqlite3
+import requests
 from dotenv import load_dotenv
 
+import sendNotify
+from sendNotify import is_product_env, dingding_bot_with_key
+from openai_utils import AIHelper
+
 key_name = "job"
-summary_list = []
+load_dotenv()
+
+# 数据库初始化
 conn = sqlite3.connect(f'{key_name}.db')
 cursor = conn.cursor()
 cursor.execute('''
@@ -19,78 +27,19 @@ cursor.execute('''
         name TEXT UNIQUE NOT NULL,
         state TEXT NOT NULL
     )
-    ''')
-load_dotenv()
-
-
-def filter_item(job_item):
-    # print(job_item)
-    title = f'''[{job_item['postTitle'].lower().strip()}]({job_item['url']})'''
-    state = f'''{job_item['descContent']}
-{job_item['source']} {job_item['salary']} {job_item['jobType']}
-'''
-    for row in get_db_data():
-        if title == row[1]:
-            print('重复已忽略')
-            return False
-    keywordList = [
-        "android 安卓 客户端 app",
-    ]
-    if any(word in title for item in keywordList for word in item.split()):
-        print(job_item)
-        print(title)
-        print(state)
-        item = {
-            'title': title,
-            'state': state,
-        }
-        summary_list.append(item)
-    else:
-        return False
-
-
-def get_hot_search():
-    url = 'https://easynomad.cn/api/posts/list?limit=15&page=1&jobCategory=%E5%BC%80%E5%8F%91&contractType='
-    resp = requests.get(url)
-    resp.encoding = 'utf-8'
-    elements = resp.json()['data']
-    for job_item in elements:
-        filter_item(job_item)
-
-
-def notify_markdown():
-    if summary_list:
-        markdown_text = ''
-        for item in summary_list:
-            markdown_text += f'''{item['title']}
-            
-{item["state"]}
-'''
-        if is_product_env():
-            insert_db(summary_list)
-        dingding_bot_with_key("job", markdown_text, f"{key_name.upper()}_BOT_TOKEN")
-        with open(f"log_{key_name}.md", 'w', encoding='utf-8') as f:
-            f.write(markdown_text)
-    else:
-        print("暂无job！！")
-
-
-def insert_db(list):
-    # 使用列表推导式将每个元素转换成元组
-    tuples_list = [(x['title'], x['state']) for x in list]
-    # 使用 executemany 来插入或替换记录
-    cursor.executemany('INSERT OR REPLACE INTO titles (name, state) VALUES (?, ?)', tuples_list)
-    conn.commit()
-
-
-def print_db():
-    for row in get_db_data():
-        print(row)
+''')
+conn.commit()
 
 
 def get_db_data():
     cursor.execute('SELECT * FROM titles')
     return cursor.fetchall()
+
+
+def insert_db(job_list):
+    tuples_list = [(x['title'], x['state']) for x in job_list]
+    cursor.executemany('INSERT OR REPLACE INTO titles (name, state) VALUES (?, ?)', tuples_list)
+    conn.commit()
 
 
 def close_db():
@@ -100,10 +49,112 @@ def close_db():
         conn.close()
 
 
+def filter_item(job_item, db_titles):
+    title = f"[{job_item['postTitle'].lower().strip()}]({job_item['url']})"
+    state = f"{job_item['descContent']}\n{job_item['source']} {job_item['salary']} {job_item['jobType']}\n"
+
+    if any(title == row[1] for row in db_titles):
+        print("重复已忽略:", title)
+        return None
+
+    keywords = "android 安卓 客户端 app python java".split()
+    if any(word in title for word in keywords):
+        return {'title': title, 'state': state}
+    return None
+
+
+def get_hot_search():
+    url = 'https://easynomad.cn/api/posts/list?limit=15&page=1&jobCategory=%E5%BC%80%E5%8F%91&contractType='
+    resp = requests.get(url)
+    resp.encoding = 'utf-8'
+    elements = resp.json().get('data', [])
+    db_titles = get_db_data()
+
+    valid_items = []
+    for job_item in elements:
+        result = filter_item(job_item, db_titles)
+        if result:
+            print("有效职位:", result['title'])
+            valid_items.append(result)
+    return valid_items
+
+
+def build_prompt(job_items):
+    prompt_prefix = (
+        "你是一个远程职位分析助手，请完成以下任务：\n"
+        "1. 将英文内容翻译为中文。\n"
+        "2. 评估每个职位的技术要求，从 1 到 10 打分，数字越高表示越难。\n"
+        "3. 每个职位请按照以下 JSON 格式返回：\n\n"
+        "```\n"
+        "[\n"
+        "  {\n"
+        "    \"title\": \"职位标题\",\n"
+        "    \"href\": \"原始链接\",\n"
+        "    \"score\": 7,\n"
+        "    \"text\": \"职位内容分析和中文翻译\",\n"
+        "    \"src_list\": [\"图片URL1\", \"图片URL2\"]\n"
+        "  },\n"
+        "  ...\n"
+        "]\n"
+        "```\n\n"
+        "请严格按照上述 JSON 格式返回，不要包含任何额外解释、标注或 markdown 语法。\n"
+        "以下是待分析的职位内容：\n"
+    )
+
+    jobs_text = ""
+    for i, item in enumerate(job_items, start=1):
+        jobs_text += (
+            f"\n---\n"
+            f"职位 {i}\n"
+            f"标题：{item['title']}\n"
+            f"内容：{item['state']}\n"
+        )
+
+    return prompt_prefix + jobs_text
+
+
+def parse_ai_response(json_response):
+    try:
+        json_data = json.loads(json_response)
+        markdown_text = ""
+        for item in json_data:
+            title = item.get("title", "未知标题")
+            href = item.get("href", "#")
+            score = item.get("score", "")
+            text = item.get("text", "")
+            images = item.get("src_list", [])
+
+            markdown_text += f"\n##### [{title} {score}]({href})\n{text}\n"
+            for img in images:
+                markdown_text += f"![]({img})\n"
+        return markdown_text, json_data[0].get("title", "Job Summary")
+    except (json.JSONDecodeError, IndexError, TypeError) as e:
+        print("解析 AI 响应失败:", e)
+        return "⚠️ 无法解析 AI 返回内容。", "AI分析失败"
+
+
+def notify_markdown(summary_list):
+    if not summary_list:
+        print("暂无 job！！")
+        return
+
+    helper = AIHelper()
+    prompt = build_prompt(summary_list)
+    json_response = asyncio.run(helper.analyze_content("", prompt))
+    markdown_text, summary = parse_ai_response(json_response)
+
+    if is_product_env():
+        insert_db(summary_list)
+
+    sendNotify.dingding_bot("job", markdown_text)
+
+    with open(f"log_{key_name}.md", 'w', encoding='utf-8') as f:
+        f.write(markdown_text)
+
+
 if __name__ == '__main__':
     try:
-        # print_db()
-        get_hot_search()
-        notify_markdown()
+        jobs = get_hot_search()
+        notify_markdown(jobs)
     finally:
         close_db()
