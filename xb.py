@@ -11,7 +11,7 @@ from sendNotify import is_product_env, dingding_bot_with_key, send_wx_push
 import sqlite3
 import re
 import asyncio
-from openai_utils import AIHelper
+from ai_utils import AIHelper
 from dotenv import load_dotenv
 import json
 
@@ -322,13 +322,10 @@ def notify_markdown():
         # 发送通知
         markdown_text += send_wx_push(summary, markdown_text, 37188)
         dingding_bot_with_key(summary, markdown_text, f"{key_name.upper()}_BOT_TOKEN")
-        if is_product_env():
-            dingding_bot_with_key(summary, markdown_text, "FLN_BOT_TOKEN")
-        else:
-            md_name = f"log_{key_name}_{get_day_string()}.md"
-            with open(md_name, 'a', encoding='utf-8') as f:
-                f.write("\n============================处理后数据===========================================\n")
-                f.write(markdown_text)
+        md_name = f"log_{key_name}_{get_day_string()}.md"
+        with open(md_name, 'a', encoding='utf-8') as f:
+            f.write("\n============================处理后数据===========================================\n")
+            f.write(markdown_text)
     else:
         print("暂无线报！！")
 

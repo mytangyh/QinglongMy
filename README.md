@@ -15,7 +15,7 @@
 * [weibo_summary](weibo_summary.py) 抓取微博热搜榜，Sqlite数据库去重，过滤一些不感兴趣的内容，简单的词频分析
 * [send_qq_email](send_qq_email.py) 发送带附件的电子邮件
 * [job_spider](job_spider.py) 指定过滤条件获取远程工作信息
-* [xb](xb.py) 全网羊毛线报精选，使用 gemini-2.0-flash-exp 模型进行内容分析
+* [xb](xb.py) 全网羊毛线报精选，使用 gemini-2.5-pro 模型进行内容分析
 * [douban_spider](douban_spider.py) 豆瓣小组（上海租房版demo）
 
 ## 安装依赖库
@@ -27,7 +27,7 @@
 ## 添加仓库
 
    ```shell
-   ql repo https://github.com/mgmg22/QinglongMy.git "summary|stock_spider|trade|epic_free_game|xb|send_qq|job" "activity|backUp|bewly" "sendNotify|stopwords|util" "main"
+   ql repo https://github.com/mgmg22/QinglongMy.git "summary|stock_spider|trade|epic_free_game|xb|send_qq|job" "activity|backUp" "sendNotify|stopwords|util" "main"
    ```
 
 ## 推送渠道及在线测试
