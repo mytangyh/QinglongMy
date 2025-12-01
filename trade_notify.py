@@ -35,13 +35,13 @@ def check_and_notify(amplitude, open_price, current, high, low, title, content):
 
 
 def check_sell_point(open_price, current, high, title, content):
-    if current - open_price > 10 and high - current < 5:
+    if ((current - open_price) / open_price * 100) > 0.625 and ((high - current) / current * 100) < 0.3125:
         title = f'[f]{title}卖点:{current}'
         send_notification(title, content)
 
 
 def check_buy_point(open_price, current, low, title, content):
-    if open_price - current > 10 and current - low < 3:
+    if ((open_price - current) / open_price * 100) > 0.625 and ((current - low) / current * 100) < 0.1875:
         title = f'[s]{title}买点:{current}'
         send_notification(title, content)
 
@@ -57,3 +57,4 @@ if __name__ == '__main__':
     t = r.cookies["xq_a_token"]
     ball.set_token(f'xq_a_token={t}')
     add_xq_increase('SH600519')
+    add_xq_increase('SZ300033')
