@@ -25,13 +25,9 @@ cursor.execute('''
 
 
 def filter_item(realtime_item):
-    # 剧集等 辟谣等
-    if realtime_item.get('flag_desc'):
-        return False
-    if realtime_item.get('is_ad'):
-        return False
-    title = realtime_item['word'].lower().strip()
-    state = realtime_item['label_name']
+    title = realtime_item.get('title')
+    # TODO state
+    state = ""
     for row in get_db_data():
         if title == row[1]:
             if state == row[2]:
@@ -73,7 +69,7 @@ def filter_item(realtime_item):
         # 姓
         "杨 汪 陈 黄 刘 杜 花 林 韩 虞 殷 崔 姚 罗 祝 张 孟 孙 孔 宋 赵 李 魏 谭 曹 郭 冯 霍 朱 蒋 谢 叶 周 邓 吴",
         "贺 柳 申 付 庞 秦 向 范 伊 唐 贾 展 沈 关 郑 曾 彭 齐 钟 蔡",
-        "佘 方 许 尚 程 毛 庾 戚 阮 荀 冉 闵 朴 翁 易 卞 解 庄 黎 祁 傅 何 戴 徐 樊 窦 梁 尹 王 胡 薛 邱 欧阳 潘 袁 成",
+        "佘 方 许 尚 程 毛 庾 戚 阮 荀 冉 闵 朴 翁 易 卞 解 庄 黎 祁 傅 何 戴 徐 樊 窦 梁 尹 王 胡 薛 邱 欧阳 潘 袁 成 俞 卢",
         # 名
         "磊 祺 咪 梓 禹 楷 灿 栩 琦 毓 鑫 莹 豪 琳 帝 俊 楠 婧 娜 皓 霏 霞 惠 莎 丽 蕾 梦 昊 翔 尔 晓 嬛 玟 菲 芳 娇 嘉 毅",
         # 英文
@@ -81,8 +77,8 @@ def filter_item(realtime_item):
     ]
     gameBlackList = [
         # 游戏
-        "和平精英 光遇 荣耀 炉石 鸢 秋季赛 第五人格 星穹铁道 kpl jdg 皮肤 阵容 回归 勇士 联盟 战队 九尾 绝区零 鸣潮 剑 燕云",
-        "电竞 评委 上路 下路 中路 对战 一血 mvp 传奇 国服 退 ig 复出 金克丝 双城 英雄 签 转会 加盟 队 卫冕 战士",
+        "和平精英 光遇 荣耀 炉石 鸢 秋季赛 第五人格 星穹铁道 kpl jdg 皮肤 阵容 回归 勇士 联盟 战队 九尾 绝区零 鸣潮 剑 燕云 叠纸",
+        "电竞 评委 上路 下路 中路 对战 一血 mvp 传奇 国服 退 ig 复出 金克丝 双城 英雄 签 转会 加盟 队 卫冕 战士 战术",
         "gala theshy uzi mlxg blg lpl rng solo",
         "比0 比1 比2 比3 比4 比5 比6 比7 比8 比9 乒 四强 八强 战胜 vs 输",
         "0分 1分 2分 3分 4分 5分 6分 7分 8分 9分 冠 连胜 连败 田径",
@@ -93,8 +89,8 @@ def filter_item(realtime_item):
     countryList = [
         "东北 海洋 敦煌 灵隐 辽",
         "西藏 新疆 青海 四川 山东",
-        "威海 三亚",
-        "法国 土耳其 印度 中东 瑞士 印尼 埃及 缅 澳 朝鲜 迪拜",
+        "威海 三亚 南京",
+        "法国 土耳其 印度 中东 瑞士 印尼 埃及 缅 澳 朝鲜 迪拜 越南",
         "台积电 机器 甲骨文",
         # 天气
         "热 冷 季 秋 暖 酸 甜 苦 辣 臭 香 冬 夏 春 雨 雪 寒 星期 今天 冰 降温 天空 爽 打雷 空调",
@@ -115,7 +111,7 @@ def filter_item(realtime_item):
         # 人
         "你 家 丈夫 奶 婴 孩 爷 姐 妹 父 儿 嬷 弟 哥 妈 爹 老公 爸 妻 嫂 叔叔 夫妇 前夫 友 男子 老人 女子 少女 女生 小伙 宝 年轻 老头 阿姨 老外 市民 辈",
         # 身份
-        "主人 租客 女主播 实习 司机 情侣 保安 教练 导游 博主 当事人 城管 物业 消防 公安 书记 顾问 警",
+        "主人 租客 女主播 实习 司机 情侣 保安 教练 导游 博主 当事人 城管 物业 消防 公安 书记 顾问 警 高管 保洁 游客 路人",
         # 生活
         "生活 工 办公 职 副业 生日 社交 吵架 骂 转账 晒 相亲 带娃 开除 丁克 会员 地铁 澡 浴 睡 公摊 动画 流量",
         # 物
@@ -131,11 +127,11 @@ def filter_item(realtime_item):
         # 衣
         "穿 裤 衣 戒指 镯 搭 妆 面霜 挑染 裙 羽绒 鞋 ootd",
         # 食
-        "外卖 食物 面包 烤肉 茶 蛋糕 粥 夜宵 良品铺子 泡面 毒 海底捞 烟 饿 炒 蒜 笋 粮 厨 蛋挞 粽 提拉米苏",
+        "外卖 食物 面包 烤肉 茶 蛋糕 粥 夜宵 良品铺子 泡面 毒 海底捞 烟 饿 炒 蒜 笋 粮 厨 蛋挞 粽 提拉米苏 饺",
         # 水果
         "榴莲 荔枝 瓜 梨 莓",
         # 动物
-        "动物 熊 柯基 鼠 虎 兔 龙 蛇 马 羊 猴 鸡 狗 野猪 猫 鸭 鹅 蜂 鹤 鸟屎 蝎 鲨鱼 海龟 蟑螂 鹿 钓鱼 宠 狼",
+        "动物 熊 柯基 鼠 虎 兔 龙 蛇 马 羊 猴 鸡 狗 野猪 猫 鸭 鹅 蜂 鹤 鸟屎 蝎 鲨鱼 海龟 蟑螂 鹿 钓鱼 宠 狼 蝶",
     ]
     otherList = [
         # 单字
@@ -145,7 +141,7 @@ def filter_item(realtime_item):
         # 说
         "说 对话 谈 称 聊 诉 喊 言 发文",
         # 娱乐
-        "团 娱 艺 剧 恋 乐 毯 逝 赛 唱 歌 舞 演 戏 幼 婚 孕 胎 飒 经纪 网红 公司 yb 维密 路透 票房 收官 钓系 镜头 亮相 海报 刊 出道 拍 秀 名人",
+        "节目 团 娱 艺 剧 恋 乐 毯 逝 赛 唱 歌 舞 演 戏 幼 婚 孕 胎 飒 经纪 网红 公司 yb 维密 路透 票房 收官 钓系 镜头 亮相 海报 刊 出道 拍 秀 名人",
         "开机 追星 长得 辟谣 古装 魅 梗 女装 模仿 影 松弛 耶 顶流 表情 粉 档 照 合约 续约 资源 摄 组合 咖 幕 男主 女主 见面 素人 大片 磕 结局 白月光 番 盛典 广告 主题 宴",
         # 女性
         "名媛 闺蜜 公主 美甲 回购 护肤 糖 滤镜 媚 吻 依偎 妃 爱 哄 浪漫 国货 中式 月子 造型 温柔 美容 领证 图 颜",
@@ -182,7 +178,7 @@ def filter_item(realtime_item):
         return False
     # print(realtime_item)
     item = {
-        'num': realtime_item['realpos'],
+        # 'num': realtime_item['realpos'],
         'title': title,
         'state': state,
     }
@@ -190,12 +186,53 @@ def filter_item(realtime_item):
 
 
 def get_hot_search():
-    url = 'https://weibo.com/ajax/side/hotSearch'
-    resp = requests.get(url)
+    url = "https://m.weibo.cn/api/container/getIndex?containerid=106003type%3D25%26t%3D3%26disable_hot%3D1%26filter_type%3Drealtimehot&title=%E5%BE%AE%E5%8D%9A%E7%83%AD%E6%90%9C&extparam=filter_type%3Drealtimehot%26mi_cid%3D100103%26pos%3D0_0%26c_type%3D30%26display_time%3D1540538388&luicode=10000011&lfid=231583"
+    headers = {
+        "referer": "https://s.weibo.com/top/summary?cate=realtimehot",
+        "mweibo-pwa": "1",
+        "x-requested-with": "XMLHttpRequest",
+    }
+    resp = requests.get(url, headers=headers)
     resp.encoding = 'utf-8'
-    elements = resp.json()['data']['realtime']
-    for realtime_item in elements:
-        filter_item(realtime_item)
+
+    try:
+        data = resp.json()
+        cards = data['data']['cards'][0]['card_group']
+    except (KeyError, IndexError, requests.exceptions.JSONDecodeError) as e:
+        print(f"解析错误: {e}")
+        print(resp.json())
+        return []
+
+    result = []
+    for i, k in enumerate(cards):
+        if i == 0:
+            continue
+        if not k.get('desc'):
+            continue
+
+        actionlog = k.get('actionlog', {})
+        if actionlog and 'ext' in actionlog and "ads_word" in actionlog['ext']:
+            continue
+
+        # 手动URL编码
+        query = k['desc'].replace(' ', '%20').replace('#', '%23').replace('&', '%26')
+
+        item = {
+            'id': k['desc'],
+            'title': k['desc'],
+            'extra': {'icon': None},
+            'url': f"https://s.weibo.com/weibo?q=%23{query}%23",  # 手动添加 # 的编码 %23
+            'mobileUrl': k.get('scheme')
+        }
+
+        # TODO state
+        if k.get('icon'):
+            item['extra']['icon'] = {
+                'url': k['icon'],
+                'scale': 1.5
+            }
+        result.append(item)
+        filter_item(item)
 
 
 def word_segment():
@@ -218,7 +255,7 @@ def notify_markdown():
         for item in summary_list:
             state_mark = f'【{item["state"]}】' if item['state'] else ''
             markdown_text += f'''
-{item['num']}.[{item['title']}](https://m.weibo.cn/search?containerid=231522type%3D1%26q%3D{quote(item['title'])}&_T_WM=16922097837&v_p=42){state_mark}
+[{item['title']}](https://m.weibo.cn/search?containerid=231522type%3D1%26q%3D{quote(item['title'])}&_T_WM=16922097837&v_p=42){state_mark}
 '''
         insert_db(summary_list)
         # sendNotify.push_me(get_title(), markdown_text, "markdown")

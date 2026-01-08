@@ -14,15 +14,46 @@ from sendNotify import is_product_env, dingding_bot_with_key, send_wx_push
 import sqlite3
 import re
 import asyncio
-from openai_utils import AIHelper
+from ai_utils import AIHelper
 from dotenv import load_dotenv
 import json
 
 key_name = "xb"
 xb_list = []
-conn = sqlite3.connect(f'{key_name}.db')
-cursor = conn.cursor()
-cursor.execute('''
+
+
+class DBHelper:
+    def __init__(self, db_name):
+
+        self.conn = sqlite3.connect(db_name)
+        self.cursor = self.conn.cursor()
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS titles (
+            id INTEGER PRIMARY KEY,
+            path INTEGER,
+            name TEXT UNIQUE NOT NULL,
+            href TEXT NOT NULL
+        )
+        ''')
+
+    def insert_many(self, items):
+        tuples_list = [(x['path'], x['title'], x['href']) for x in items]
+        self.cursor.executemany('INSERT OR IGNORE INTO titles (path,name, href) VALUES (?, ?, ?)', tuples_list)
+        self.conn.commit()
+
+    def fetch_all(self):
+        self.cursor.execute('SELECT * FROM titles')
+        return self.cursor.fetchall()
+
+    def close(self):
+        if self.cursor:
+            self.cursor.close()
+        if self.conn:
+            self.conn.close()
+
+    conn = sqlite3.connect(f'{key_name}.db')
+    cursor = conn.cursor()
+    cursor.execute('''
     CREATE TABLE IF NOT EXISTS titles (
         id INTEGER PRIMARY KEY,
         path INTEGER,
@@ -31,6 +62,8 @@ cursor.execute('''
     )
     ''')
 
+
+db = DBHelper(f'{key_name}.db')
 load_dotenv()
 
 cxkWhiteList = ["中国银行", "中行", "农业银行", "农行", "交通银行", "交行", "浦发", "邮储", "邮政", "光大", "兴业",
@@ -43,9 +76,9 @@ def has_white_bank_name(content):
 
 whiteWordList = [word for item in [
     "云闪付 ysf xyk 性用卡 还款 工商银行 工商 工行 工银 e生活 建设银行 建行 建融 招商银行 招行 掌上生活 体验金 中信 动卡空间",
-    "淘宝 tb 手淘 天猫 猫超 支付宝 zfb 转账 某付宝 微信 wx vx v.x 小程序 立减金 ljj 公众号 原文 推文 京东 狗东 jd 京豆 e卡 美团 elm",
-    "抖音 dy","闲鱼 同程 携程 途牛 霸王茶姬",
-    "水 必中 红包 虹包 抽奖 秒到 保底 游戏 下载 话费 移动 和包 电信 q币 扣币 麦当劳 肯德基 必胜客 星巴克 瑞幸 朴朴 喜茶 百果园 礼品卡 星礼卡 深圳通 网上国网",
+    "手淘 天猫 猫超 支付宝 zfb 转账 某付宝 微信 wx vx v.x 小程序 立减金 ljj 公众号 原文 推文 京东 狗东 jd 京豆 e卡 美团 elm",
+    "淘宝 tb 抖音 dy 闲鱼 同程 携程 途牛 霸王茶姬",
+    "水 必中 红包 虹包 抽奖 秒到 保底 游戏 下载 话费 移动 和包 电信 q币 扣币 麦当劳 肯德基 必胜客 星巴克 瑞幸 朴朴 喜茶 礼品卡 星礼卡 深圳通 网上国网",
     "国补",
 ] for word in item.split()]
 
@@ -74,7 +107,7 @@ def get_complete_content(content):
             original_text = a_tag.get_text()
             if re.search(r'http[s]?://\S+', original_text):
                 # Replace the original text with markdown format
-                markdown_link = f'[{original_text}]({href})'
+                markdown_link = f'[{href}]({href})'
                 text = text.replace(original_text, markdown_link)
     return text
 
@@ -88,22 +121,22 @@ commonBlackList = [word for item in [
     # ----无效----
     "特邀 受邀 瘦腰 收腰 临期 值得买",
     # ----超链接----
-    "出门靠朋友 深i工",
+    "vip.iqiyi.com 出门靠朋友 深i工 今天多少 55618 【888】",
     # ----问题----
     "么 问题 问问 问下 谢谢 请问 问一下 别问 请教 求 咋 怎样 咨询 赐教 啥 有问 行不 何解 不行 原因 帮忙看 哪来的 都多少 是多少 是不是 有谁 大佬",
     "果熟 有果 油果 彦祖 亦菲 多不 谁有 有没 如何 预算 你们都 几号 到底 多少出 哥哥们",
     # ----数码----
     "华为 huawei 荣耀手机 mipay 果子 苹果 iphone airpods pm 亚瑟 大疆 数据 k70",
     # ----生活居家----
-    "內衣 拖鞋 洞洞鞋 购物袋 布袋 婴 小孩 孩子 辣妈 无线 牙膏 拉拉裤 伞 锅 电动车 盔 清风 纸 维达 杯 椅 菌 石头 奥妙 家政 冈本 南极人 巾 染 一次性 蚊香 容声 沐浴 力士",
+    "內衣 拖鞋 洞洞鞋 购物袋 布袋 婴 童装 小孩 孩子 辣妈 无线 牙膏 拉拉裤 伞 锅 电动车 盔 清风 纸 维达 杯 椅 菌 石头 奥妙 家政 冈本 南极人 巾 染 一次性 蚊香 容声 沐浴 力士",
     # ----风险----
     "风险 美元 提额 保险 开通 境外 秒批 下卡 开户 贷 征信 费率 pos 人脸 审批 黄牛 客服 天天基金 东方财富",
 ] for word in item.split()]
 highBlackList = [word for item in [
     # ----玩法----
-    "【顶】 需要邀请 助力 人团 拼团 调研 申请x 互助 攒能量 组队 组团 首单 盲盒 月黑风高 互换 入会 买1送1 买一送一",
+    "【顶】 需要邀请 助力 人团 拼团 调研 申请x 互助 攒能量 组队 组团 首单 盲盒 月黑风高 互换 入会 买1送1 买一送一 蒸蒸日上 淘宝秒杀 必免 膨胀",
     # ----网购----
-    "支 件 /袋 /盒 /斤 箱 罐 xl 货 瓶 降 9.9 如有 折合 到手 买家 小法庭 单号 预售 话术 拆单 查询 高佣 想买 尾款 小黄鱼 放量 dy商城 二手 出售",
+    "00g 支 件 /袋 /盒 /斤 箱 罐 xl 货 瓶 降 9.9 如有 折合 到手 买家 小法庭 单号 预售 话术 拆单 查询 高佣 想买 尾款 小黄鱼 放量 dy商城 二手 出售",
     # ----形容词----
     "限量 健康 地道 进口 真诚 厉害 有点6 骚 不要脸 蛋疼 奇怪 大事 谱 恶心 太乱 太贵 真的 好玩",
     # "瓶 返 凑",
@@ -129,23 +162,23 @@ highBlackList = [word for item in [
 lowBlackList = [word for item in [
     "多拍 券包 免单 预售 试用 点秒杀 以旧换新 小程序下单 直播间下单 折券 津贴",
     # ----食品----
-    "三只松鼠 百草味 海底捞 认养一头牛 火锅 烧烤 麻辣烫 馋 卤 炖 火腿 爪 蛋白 豆浆 维生素 麦片 飞鹤 粥 面 小麦 米线 粉 粮 裙带菜 蒜 阿胶 巧克力 糖",
+    "三只松鼠 百草味 海底捞 认养一头牛 火锅 烧烤 麻辣烫 馋 卤 炖 火腿 爪 蛋白 豆浆 维生素 麦片 飞鹤 粥 面 小麦 米线 粉 粮 裙带菜 蒜 阿胶 巧克力 糖 蛋挞",
     # ----生鲜----
     "巧乐兹 梦龙 可生食 羊肉 虾 粽 笋 大闸蟹 海参 榴莲 梨 柠檬 香菇 鲜花 莓 玫瑰 酸菜 雪糕 冰淇淋 柿 脐橙 瓜",
     # ----饮料----
-    "饮料 果汁 百岁山 农夫 矿泉水 茅台 酒 窖 特仑苏 椰子 茶叶 观音 奶茶 coco 奈雪 蜜雪 茶百道 古茗 库迪",
+    "饮料 果汁 百岁山 农夫 矿泉水 茅台 酒 窖 特仑苏 椰子 茶叶 观音 奶茶 coco 奈雪 蜜雪 茶百道 古茗 库迪 口服",
     # ----美妆个护----
-    "珀莱雅 雅诗兰黛 毛戈平 潘婷 屈臣氏 大宝 金纺 立白 科颜氏 林清轩 欧莱雅 苏菲 蔻 洗 眉 唇 泥 日抛 护理 采销 卫生 敏感肌 美妆蛋 保湿 美白 防晒 精粹 海蓝 口罩 olay 薇",
+    "美妆 珀莱雅 雅诗兰黛 毛戈平 潘婷 屈臣氏 大宝 金纺 立白 科颜氏 林清轩 欧莱雅 苏菲 蔻 洗 眉 唇 泥 日抛 护理 采销 卫生 敏感肌 保湿 美白 防晒 精粹 海蓝 口罩 olay 薇 美瞳",
     # ----其他实物----
     "佛 机油 宠物 翡翠 轮胎 图书 小家电",
     # ----品牌----
     "第三方 京造 京东买药 严选 喵满分 李佳琦 工厂 宇辉",
     # ----虚拟卡券----
-    "火车 电影 门票 打车 顺风车 单车 流量 gb 出行优惠券 网盘 地铁 网易云 机票 别墅 顺丰 快递 充电 民宿 芒果 年卡 腾讯视频 体检",
+    "火车 电影 门票 打车 顺风车 养车 流量 gb 出行优惠券 网盘 地铁 网易云 机票 别墅 顺丰 快递 充电 民宿 芒果 年卡 腾讯视频 体检",
     # ----线下门店----
     "沪上阿姨 永和大王 沃尔玛 永辉 盒马 联华 costa 桌游 米其林 奥特莱斯 试驾",
     # ----无效----
-    "plus yzf 翼支付 svip 联通 移动套餐 美团圈圈 王卡 钻石会员 铂金 腾讯vip 聚惠出行",
+    "plus yzf 翼支付 svip 联通 移动套餐 美团圈圈 王卡 钻石会员 铂金 黑金 腾讯vip 聚惠出行 凡科",
 ] for word in item.split()]
 
 
@@ -163,15 +196,12 @@ def filter_list(tr):
     if has_black_xyk_name(title):
         print("----无该行信用卡，已忽略" + '\t\t' + href)
         return False
-    if any(sub in title for sub in commonBlackList):
-        return False
-    if any(sub in title for sub in highBlackList):
-        return False
-    if any(sub in title for sub in lowBlackList):
+    all_blacklist = set(commonBlackList) | set(highBlackList) | set(lowBlackList)
+    if any(sub in title for sub in all_blacklist):
         return False
     if not has_white_word(title) and not has_white_bank_name(title):
         return False
-    for row in get_db_data():
+    for row in db.fetch_all():
         if path_id == row[1]:
             print('重复已忽略')
             return False
@@ -200,7 +230,7 @@ def filter_list(tr):
 
 
 def get_content(href):
-    data = requests.get(href)
+    data = requests.get(href, proxies={})
     data.encoding = 'utf-8'
     soup = BeautifulSoup(data.text, 'html.parser')
     xb_content = soup.find('div', id='xbcontent')
@@ -227,7 +257,7 @@ def get_top_summary():
 def notify_markdown():
     if xb_list:
         if is_product_env():
-            insert_db(xb_list)
+            db.insert_many(xb_list)
         helper = AIHelper()
         print(xb_list)
         prompt = f'''请分析以下内容的价值，并返回符合预期的内容。
@@ -245,7 +275,7 @@ def notify_markdown():
         "href": "示例链接",
         "src_list": ["图片链接1", "图片链接2"],
         "text": "示例文本内容",
-        "score": "「4分」优惠力度大，活动简单"
+        "score": "4分」优惠力度大，活动简单"
     }}
 ]
 
@@ -287,51 +317,26 @@ def notify_markdown():
         markdown_text = ''
         for item in json_data:
             markdown_text += f'''
-##### [{item['title']}{item['score']}]({item['href']})
+##### 📌[{item['title']}🌟{item['score']}]({item['href']})
 {item['text']}
 '''
             for img in item['src_list']:
                 markdown_text += f'![]({img})'
         summary = json_data[0]['title']
         # 发送通知
-        # markdown_text += send_wx_push(summary, markdown_text, 37188)
-        markdown_text += markdown_to_html(markdown_text)
-        print(markdown_text)
-        sendNotify.dingding_bot(summary, markdown_text)
-        if is_product_env():
-            sendNotify.dingding_bot(summary, markdown_text)
-        else:
-            md_name = f"log_{key_name}_{get_day_string()}.md"
-            with open(md_name, 'a', encoding='utf-8') as f:
-                f.write("\n============================处理后数据===========================================\n")
-                f.write(markdown_text)
+        markdown_text += send_wx_push(summary, markdown_text, 37188)
+        dingding_bot_with_key(summary, markdown_text, f"{key_name.upper()}_BOT_TOKEN")
+        md_name = f"log_{key_name}_{get_day_string()}.md"
+        with open(md_name, 'a', encoding='utf-8') as f:
+            f.write("\n============================处理后数据===========================================\n")
+            f.write(markdown_text)
     else:
         print("暂无线报！！")
 
 
-def insert_db(list):
-    # 使用列表推导式将每个元素转换成元组
-    tuples_list = [(x['path'], x['title'], x['href']) for x in list]
-    # 使用 executemany 来插入多条记录
-    cursor.executemany('INSERT OR IGNORE INTO titles (path,name, href) VALUES (?, ?, ?)', tuples_list)
-    conn.commit()
-
-
 def print_db():
-    for row in get_db_data():
+    for row in db.fetch_all():
         print(row)
-
-
-def get_db_data():
-    cursor.execute('SELECT * FROM titles')
-    return cursor.fetchall()
-
-
-def close_db():
-    if cursor:
-        cursor.close()
-    if conn:
-        conn.close()
 
 
 if __name__ == '__main__':
@@ -340,4 +345,4 @@ if __name__ == '__main__':
         get_top_summary()
         notify_markdown()
     finally:
-        close_db()
+        db.close()
