@@ -5,6 +5,8 @@
 # new Env('杭州租房');
 # """
 from douban_scraper import DoubanScraper
+from datetime import datetime
+import sendNotify
 import time
 
 summary_list = []
@@ -119,10 +121,9 @@ def get_top_summary(start: int = 0, max_items: int = 20, max_pages: int = 6):
         max_pages: 最大页数限制
     """
     scraper = DoubanScraper()
-    # 杭州租房小组列表
+    # 杭州租房小组列表（已验证可用）
     hangzhou_groups = [
-        'hangzhouzu',  # 杭州租房
-        '571home',     # 杭州租房小组
+        'hzhouse',         # 杭州租房小组（活跃）
     ]
 
     try:
@@ -153,7 +154,27 @@ def get_top_summary(start: int = 0, max_items: int = 20, max_pages: int = 6):
         scraper.close()
 
 
+def notify_markdown():
+    """发送钉钉通知"""
+    if not summary_list:
+        print("暂无符合条件的租房信息")
+        return
+
+    title = f"{datetime.now().hour}点杭州租房"
+    markdown_text = f"### {title}\n\n"
+
+    for item in summary_list:
+        markdown_text += f"- [{item['title']}]({item['link']}) - {item['time']}\n"
+
+    sendNotify.dingding_bot(title, markdown_text)
+    print(f"\n已推送 {len(summary_list)} 条租房信息到钉钉")
+
+    with open("log_hangzhou.md", 'w', encoding='utf-8') as f:
+        f.write(markdown_text)
+
+
 if __name__ == '__main__':
     processed_links = set()
     summary_list = []
     get_top_summary()
+    notify_markdown()
