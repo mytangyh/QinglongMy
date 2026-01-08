@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 import sendNotify
 from sendNotify import is_product_env, dingding_bot_with_key
-from openai_utils import AIHelper
+from ai_utils import AIHelper
 
 key_name = "job"
 load_dotenv()

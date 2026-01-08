@@ -17,8 +17,13 @@ class AIHelper:
         if not self.base_url:
             raise ValueError("API_URL 环境变量未设置")
 
-    async def chat_completion(self, prompt: str, model: str = "gemini-2.5-pro") -> str:
+        # 从环境变量获取模型名称，默认使用 minimaxai/minimax-m2.1
+        self.default_model = os.getenv('API_MODEL', 'minimaxai/minimax-m2.1')
+
+    async def chat_completion(self, prompt: str, model: str = None) -> str:
         # 调用API进行对话
+        if model is None:
+            model = self.default_model
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
@@ -109,3 +114,23 @@ class AIHelper:
 
         # 返回结果字符串
         return results[0]
+
+    async def test_availability(self) -> bool:
+        """测试 AI 服务可用性"""
+        try:
+            print("正在测试 AI 服务连接...")
+            prompt = "Hello, reply with 'OK' if you can hear me."
+            response = await self.chat_completion(prompt)
+            print(f"AI 服务连接成功。响应: {response}")
+            return True
+        except Exception as e:
+            print(f"AI 服务连接失败: {str(e)}")
+            return False
+
+
+if __name__ == "__main__":
+    async def main():
+        ai = AIHelper()
+        await ai.test_availability()
+
+    asyncio.run(main())

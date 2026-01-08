@@ -324,8 +324,9 @@ def notify_markdown():
                 markdown_text += f'![]({img})'
         summary = json_data[0]['title']
         # 发送通知
-        markdown_text += send_wx_push(summary, markdown_text, 37188)
-        dingding_bot_with_key(summary, markdown_text, f"{key_name.upper()}_BOT_TOKEN")
+        markdown_text += markdown_to_html(markdown_text)
+        print(markdown_text)
+        sendNotify.dingding_bot(summary, markdown_text)
         md_name = f"log_{key_name}_{get_day_string()}.md"
         with open(md_name, 'a', encoding='utf-8') as f:
             f.write("\n============================处理后数据===========================================\n")

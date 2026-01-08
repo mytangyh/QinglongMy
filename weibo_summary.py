@@ -186,53 +186,91 @@ def filter_item(realtime_item):
 
 
 def get_hot_search():
-    url = "https://m.weibo.cn/api/container/getIndex?containerid=106003type%3D25%26t%3D3%26disable_hot%3D1%26filter_type%3Drealtimehot&title=%E5%BE%AE%E5%8D%9A%E7%83%AD%E6%90%9C&extparam=filter_type%3Drealtimehot%26mi_cid%3D100103%26pos%3D0_0%26c_type%3D30%26display_time%3D1540538388&luicode=10000011&lfid=231583"
-    headers = {
-        "referer": "https://s.weibo.com/top/summary?cate=realtimehot",
-        "mweibo-pwa": "1",
-        "x-requested-with": "XMLHttpRequest",
-    }
-    resp = requests.get(url, headers=headers)
-    resp.encoding = 'utf-8'
-
-    try:
-        data = resp.json()
-        cards = data['data']['cards'][0]['card_group']
-    except (KeyError, IndexError, requests.exceptions.JSONDecodeError) as e:
-        print(f"解析错误: {e}")
-        print(resp.json())
-        return []
-
-    result = []
-    for i, k in enumerate(cards):
-        if i == 0:
-            continue
-        if not k.get('desc'):
-            continue
-
-        actionlog = k.get('actionlog', {})
-        if actionlog and 'ext' in actionlog and "ads_word" in actionlog['ext']:
-            continue
-
-        # 手动URL编码
-        query = k['desc'].replace(' ', '%20').replace('#', '%23').replace('&', '%26')
-
-        item = {
-            'id': k['desc'],
-            'title': k['desc'],
-            'extra': {'icon': None},
-            'url': f"https://s.weibo.com/weibo?q=%23{query}%23",  # 手动添加 # 的编码 %23
-            'mobileUrl': k.get('scheme')
+    # 备用API列表
+    apis = [
+        {
+            "url": "https://weibo.com/ajax/side/hotSearch",
+            "headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://weibo.com/",
+            },
+            "parser": "ajax"
+        },
+        {
+            "url": "https://m.weibo.cn/api/container/getIndex?containerid=106003type%3D25%26t%3D3%26disable_hot%3D1%26filter_type%3Drealtimehot&title=%E5%BE%AE%E5%8D%9A%E7%83%AD%E6%90%9C&extparam=filter_type%3Drealtimehot%26mi_cid%3D100103%26pos%3D0_0%26c_type%3D30%26display_time%3D1540538388&luicode=10000011&lfid=231583",
+            "headers": {
+                "referer": "https://s.weibo.com/top/summary?cate=realtimehot",
+                "mweibo-pwa": "1",
+                "x-requested-with": "XMLHttpRequest",
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+            },
+            "parser": "mobile"
         }
+    ]
 
-        # TODO state
-        if k.get('icon'):
-            item['extra']['icon'] = {
-                'url': k['icon'],
-                'scale': 1.5
-            }
-        result.append(item)
-        filter_item(item)
+    for api_config in apis:
+        try:
+            resp = requests.get(api_config["url"], headers=api_config["headers"], timeout=10)
+            resp.encoding = 'utf-8'
+            data = resp.json()
+
+            # 检查是否需要登录
+            if data.get('ok') == -100 or data.get('ok') == 0:
+                print(f"API {api_config['parser']} 需要登录，尝试下一个...")
+                continue
+
+            if api_config["parser"] == "ajax":
+                # 解析 weibo.com/ajax/side/hotSearch 格式
+                if data.get('ok') == 1 and 'data' in data:
+                    realtime = data['data'].get('realtime', [])
+                    for item in realtime:
+                        if item.get('is_ad'):  # 跳过广告
+                            continue
+                        word = item.get('word', '')
+                        if not word:
+                            continue
+                        query = word.replace(' ', '%20').replace('#', '%23').replace('&', '%26')
+                        result_item = {
+                            'id': word,
+                            'title': word,
+                            'extra': {'icon': None},
+                            'url': f"https://s.weibo.com/weibo?q=%23{query}%23",
+                            'mobileUrl': f"https://m.weibo.cn/search?containerid=100103type%3D1%26q%3D{quote(word)}"
+                        }
+                        filter_item(result_item)
+                    print(f"成功使用 {api_config['parser']} API 获取热搜")
+                    return
+            else:
+                # 解析 m.weibo.cn 格式
+                cards = data['data']['cards'][0]['card_group']
+                for i, k in enumerate(cards):
+                    if i == 0:
+                        continue
+                    if not k.get('desc'):
+                        continue
+                    actionlog = k.get('actionlog', {})
+                    if actionlog and 'ext' in actionlog and "ads_word" in actionlog['ext']:
+                        continue
+                    query = k['desc'].replace(' ', '%20').replace('#', '%23').replace('&', '%26')
+                    item = {
+                        'id': k['desc'],
+                        'title': k['desc'],
+                        'extra': {'icon': None},
+                        'url': f"https://s.weibo.com/weibo?q=%23{query}%23",
+                        'mobileUrl': k.get('scheme')
+                    }
+                    if k.get('icon'):
+                        item['extra']['icon'] = {'url': k['icon'], 'scale': 1.5}
+                    filter_item(item)
+                print(f"成功使用 {api_config['parser']} API 获取热搜")
+                return
+
+        except (KeyError, IndexError, requests.exceptions.JSONDecodeError, requests.exceptions.RequestException) as e:
+            print(f"API {api_config['parser']} 解析错误: {e}")
+            continue
+
+    print("所有 API 均失败，无法获取热搜数据")
 
 
 def word_segment():
@@ -263,7 +301,7 @@ def notify_markdown():
         with open("log_weibo.md", 'w', encoding='utf-8') as f:
             f.write(markdown_text)
     else:
-        sendNotify.push_me(get_title(), "", "markdata")
+        sendNotify.dingding_bot(get_title(), "")
 
 
 def get_title() -> str:
